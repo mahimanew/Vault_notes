@@ -1,0 +1,6 @@
+vault auth enable kubernetes
+
+vault write auth/kubernetes/config \
+  kubernetes_host="https://<k8s-api-server>" \
+  kubernetes_ca_cert=@/etc/ssl/certs/ca-certificates.crt \
+  token_reviewer_jwt="<k8s-service-account-token>"
