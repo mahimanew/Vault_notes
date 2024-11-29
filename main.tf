@@ -1,3 +1,23 @@
+terraform {
+  required_providers {
+    vault = {
+      source  = "hashicorp/vault"
+      version = "~> 3.14.0"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.5.1"
+    }
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.0.0"
+    }
+  }
+
+  required_version = ">= 1.0.0"
+}
+
+
 /* provider "vault" {
   address = "https://your-vault-address"
   
@@ -8,39 +28,43 @@
 } */
 
 provider "vault" {
-  address = "https://your-vault-address"
+  address = "https://3.92.45.101:8202"
 
   # Token authentication method
-  token = ""  # Vault token, can be stored in a variable or environment variable
-}
-# Read the JSON file containing the users data
-data "local_file" "users_data" {
-  filename = "secrets_data.json"
+  token           = "" # Vault token, can be stored in a variable or environment variable
+  skip_tls_verify = true
 }
 
-# Parse the JSON file into a map
-data "json" "users_json" {
-  json = data.local_file.users_data.content
+
+
+# Read the JSON file containing the users data
+data "local_file" "users_data" {
+  filename = "users.json"
+}
+
+# Parse the JSON content using jsondecode
+locals {
+  users = jsondecode(data.local_file.users_data.content)["users"]
 }
 
 # Generate UUIDs dynamically for each user
 resource "random_uuid" "user_uuids" {
-  count = length(data.json.users_json.json["users"])
+  count = length(local.users)
 }
 
 # Create Vault secrets for each user, appending UUID to the user data
 resource "vault_generic_secret" "user_secrets" {
-  count = length(data.json.users_json.json["users"])
+  count = length(local.users)
 
-  path = "secret/data/users/${random_uuid.user_uuids[count.index].result}"
+  path = "users-data/${random_uuid.user_uuids[count.index].result}"
 
   data_json = jsonencode(
     merge(
       {
-        uuid        = random_uuid.user_uuids[count.index].result
-        email       = data.json.users_json.json["users"][count.index]["email"]
-        role        = data.json.users_json.json["users"][count.index]["role"]
-        ApiService  = data.json.users_json.json["users"][count.index]["ApiService"]
+        uuid       = random_uuid.user_uuids[count.index].result
+        email      = local.users[count.index]["email"]
+        role       = local.users[count.index]["role"]
+        ApiService = local.users[count.index]["ApiService"]
       }
     )
   )
